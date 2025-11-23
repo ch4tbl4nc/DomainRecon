@@ -1,0 +1,4 @@
+// Ce fichier permet d'ignorer les fichiers de build et node_modules
+/node_modules
+/build
+/.env
