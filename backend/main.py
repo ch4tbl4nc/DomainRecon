@@ -8,7 +8,6 @@ import logging
 
 app = FastAPI()
 
-# CORS pour le frontend React
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
