@@ -1,0 +1,29 @@
+# =============================================================================
+# DomainRecon - Git Ignore
+# =============================================================================
+
+# Environnement
+.env
+*.env.local
+venv/
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+
+# Docker volumes locaux
+postgres_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (si frontend React était utilisé)
+node_modules/
+package-lock.json

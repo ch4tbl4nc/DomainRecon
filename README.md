@@ -1,143 +1,132 @@
-# WHOIS Tool 🌐
+# DomainRecon
 
-> A modern WHOIS lookup tool with an intuitive web interface, powered by FastAPI and React.
+> Outil OSINT pour la reconnaissance de domaines — interface web conteneurisée
 
-[![Python](https://img.shields.io/badge/Python-3.7+-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-Latest-009688.svg)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-Latest-61DAFB.svg)](https://reactjs.org/)
+[![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688.svg)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
 
-## 📖 About
+## 📖 Description
 
-**WHOIS Tool** is a high-performance web application for performing WHOIS lookups on domain names. The tool combines the power of an asynchronous FastAPI backend with a modern and reactive React interface.
+`DomainRecon` est une petite application web qui automatise la collecte d'informations publiques sur un domaine :
 
-### 🎯 Key Features
+- Résolution DNS (adresses IP)
+- Relevé des headers HTTP et contrôles basiques de sécurité
+- Récupération des données DomainRecon (registrar, dates, serveurs DNS)
+- Persistance des résultats dans une base de données PostgreSQL
 
-- 🔍 **Instant WHOIS Lookup**: Retrieve complete domain information in real-time
-- 📊 **Detailed Information**: Registrar, WHOIS servers, creation/expiration dates, status, DNS, emails
-- ⚡ **Optimal Performance**: Asynchronous backend with caching for ultra-fast responses
-- 🎨 **Modern Interface**: Intuitive and responsive UI built with React
-- 🔄 **REST API**: Automatically documented FastAPI backend (Swagger/OpenAPI)
+L'application se compose d'un backend (`FastAPI`) exposant une API pour lancer des scans et consulter l'historique, et d'un frontend statique servi par `nginx`.
 
 ---
 
-## 🚀 Installation
+## 🛠️ Stack technique
 
-### Prerequisites
+- Backend : `FastAPI` (+ SQLAlchemy pour la persistance)
+- Base de données : `PostgreSQL`
+- Frontend : HTML + JavaScript (serveur `nginx` dans le conteneur frontend)
+- Conteneurisation : `Docker` + `docker-compose`
 
-- **Python 3.7+** ([Download](https://www.python.org/downloads/))
-- **Node.js 14+** and npm ([Download](https://nodejs.org/))
+---
 
-### 1️⃣ Backend Setup
+## 🚀 Installation et exécution
 
-```bash
-# Navigate to the backend folder
+### Prérequis
+
+- Docker et Docker Compose installés sur la machine.
+
+### Lancer via Docker Compose (recommandé)
+
+Ouvrir un terminal (PowerShell) à la racine du dépôt puis :
+
+```powershell
+git clone https://github.com/ch4tbl4nc/DomainRecon.git
+cd DomainRecon
+# Copier le fichier d'exemple d'environnement si nécessaire
+copy .env.example .env
+
+# Construire et lancer les services
+docker-compose up --build
+```
+
+Par défaut, les services exposent :
+
+- Frontend : http://localhost
+- API : http://localhost:8000
+- Documentation (Swagger) : http://localhost:8000/docs
+
+> Remarque : si un port est déjà pris, adaptez `docker-compose.yml` ou arrêtez le service concurrent.
+
+### Exécution locale du backend (sans Docker)
+
+Si vous souhaitez exécuter seulement le backend en local pour développement :
+
+```powershell
 cd backend
-
-# Install Python dependencies
-pip install fastapi uvicorn[standard] python-whois pydantic
-
-# Start the FastAPI server
-start.bat
-# Or on Linux/Mac: uvicorn main:app --reload
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+# Lancer le serveur (supposant que l'app expose l'objet FastAPI `app` dans `app/main.py`)
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The backend will be accessible at **http://localhost:8000**  
-📚 API Documentation: **http://localhost:8000/docs**
+---
 
-### 2️⃣ Frontend Setup
+## 📁 Structure du projet
+
+```
+DomainRecon/
+├── docker-compose.yml
+├── .env.example
+├── LICENSE
+├── README.md
+├── backend/
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── app/
+│       ├── __init__.py
+│       ├── main.py
+│       ├── database.py
+│       ├── models.py
+│       └── scanner.py
+└── frontend/
+    ├── Dockerfile
+    ├── nginx.conf
+    └── index.html
+```
+
+---
+
+## 🔌 API (principales routes)
+
+- `POST /scan` : lancer un scan pour un domaine (payload JSON: `{ "domain": "example.com" }`).
+- `GET /history` : récupérer l'historique des scans.
+- `GET /scan/{id}` : récupérer les détails d'un scan par son identifiant.
+- `GET /health` : état de santé de l'API.
+
+Exemple (curl) :
 
 ```bash
-# Navigate to the frontend folder
-cd frontend
-
-# Install Node.js dependencies
-npm install
-
-# Start the React application
-npm start
-```
-
-The web interface will be accessible at **http://localhost:3000**
-
----
-
-## 💻 Usage
-
-1. Open your browser at **http://localhost:3000**
-2. Enter a domain name (e.g., `example.com`)
-3. Click **Search**
-4. WHOIS information displays instantly
-
-### Example Result
-
-<img src="/img/image.png">
-
----
-
-## 🛠️ REST API
-
-The backend exposes a complete REST API:
-
-### Main Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/` | API home page |
-| `GET` | `/whois/{domain}` | WHOIS lookup for a domain |
-| `GET` | `/docs` | Interactive Swagger documentation |
-
-### Usage Example
-
-```bash
-# With curl
-curl http://localhost:8000/whois/example.com
-
-# With httpie
-http GET http://localhost:8000/whois/example.com
+curl -X POST http://localhost:8000/scan \
+  -H "Content-Type: application/json" \
+  -d '{"domain": "example.com"}'
 ```
 
 ---
 
-## 🧰 Technologies Used
+## 📝 Contribution
 
-### Backend
-- **FastAPI**: High-performance asynchronous web framework
-- **python-whois**: WHOIS query library
-- **Pydantic**: Data validation and serialization
-- **Uvicorn**: Lightning-fast ASGI server
-
-### Frontend
-- **React**: JavaScript library for user interfaces
-- **Axios**: HTTP client for API calls
-- **CSS3**: Modern and responsive styling
+- Ouvrez une issue pour proposer une amélioration ou signaler un bug.
+- Faites une branche, ajoutez des tests si possible, et soumettez une pull request.
 
 ---
 
-## 📄 License
+## ⚖️ Licence
 
-This project is licensed under the [MIT License](LICENSE). You are free to use, modify, and distribute it.
-
----
-
-## 🙏 Acknowledgments
-
-- Powered by [python-whois](https://pypi.org/project/python-whois/)
-- Backend with [FastAPI](https://fastapi.tiangolo.com/)
-- Frontend with [React](https://reactjs.org/)
+Ce projet est distribué sous la licence MIT — voir le fichier `LICENSE`.
 
 ---
 
-## 💬 Contact & Contribution
-
-Created with ❤️ by **ch4tbl4nc**
-
----
-
-<div align="center">
-
-**Thank you for using WHOIS Tool!** 🚀
-
-</div>
+Si vous voulez que je précise des exemples d'usage, que j'ajoute des captures d'écran ou que j'adapte les instructions Windows/Mac, dites-le et je mets à jour le `README.md`.

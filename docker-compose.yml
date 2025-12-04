@@ -1,0 +1,77 @@
+# =============================================================================
+# DomainRecon - Docker Compose
+# =============================================================================
+# Architecture : Frontend (nginx) + API (FastAPI) + BDD (PostgreSQL)
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL - Base de données
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:15-alpine
+    container_name: domainrecon_db
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - domainrecon_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # API Backend - FastAPI
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: domainrecon_api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    ports:
+      - "8000:8000"
+    networks:
+      - domainrecon_network
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Frontend - Nginx (fichiers statiques)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: domainrecon_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks:
+      - domainrecon_network
+    depends_on:
+      - api
+
+# -----------------------------------------------------------------------------
+# Réseau isolé
+# -----------------------------------------------------------------------------
+networks:
+  domainrecon_network:
+    driver: bridge
+
+# -----------------------------------------------------------------------------
+# Volume persistant
+# -----------------------------------------------------------------------------
+volumes:
+  postgres_data:

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DomainRecon - OSINT Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'cyber': {
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes pulse-cyber {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse-cyber { animation: pulse-cyber 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .terminal-text { font-family: 'Courier New', monospace; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4ade80; border-radius: 4px; }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
+    
+    <header class="bg-gray-800 border-b border-gray-700 shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i class="fa-solid fa-magnifying-glass text-3xl text-cyber-400"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold text-cyber-400">DomainRecon</h1>
+                        <p class="text-sm text-gray-400">OSINT Domain Scanner</p>
+                    </div>
+                </div>
+                <div id="api-status" class="flex items-center space-x-2">
+                    <span class="w-3 h-3 bg-gray-500 rounded-full" id="status-indicator"></span>
+                    <span class="text-sm text-gray-400" id="status-text">Vérification...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8 flex-1">
+        
+        <section class="max-w-3xl mx-auto mb-8">
+            <div class="bg-gray-800 rounded-lg p-6 shadow-xl border border-gray-700">
+                <h2 class="text-xl font-semibold mb-4 text-cyber-400"><i class="fa-solid fa-crosshairs mr-2"></i>Scanner un domaine</h2>
+                <form id="scan-form" class="space-y-4">
+                    <div>
+                        <label for="domain-input" class="block text-sm font-medium text-gray-300 mb-2">
+                            Entrez un domaine ou une URL complète :
+                        </label>
+                        <div class="flex space-x-2">
+                            <input 
+                                type="text" 
+                                id="domain-input"
+                                name="domain"
+                                placeholder="ex: google.com ou https://www.example.com/page"
+                                class="flex-1 px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyber-500 focus:border-transparent transition duration-200"
+                                required
+                                autocomplete="off"
+                            >
+                            <button 
+                                type="submit"
+                                id="scan-button"
+                                class="px-6 py-3 bg-cyber-600 hover:bg-cyber-500 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-cyber-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition duration-200 flex items-center space-x-2"
+                            >
+                                <span>Scanner</span>
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500">
+                        <i class="fa-solid fa-lightbulb mr-1"></i>L'URL sera automatiquement parsée pour extraire le domaine.
+                    </p>
+                </form>
+            </div>
+        </section>
+
+        <section id="loading-section" class="hidden max-w-3xl mx-auto mb-8">
+            <div class="bg-gray-800 rounded-lg p-6 shadow-xl border border-gray-700">
+                <div class="flex items-center justify-center space-x-4">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-cyber-400"></div>
+                    <span class="text-cyber-400 animate-pulse-cyber">Scan en cours...</span>
+                </div>
+            </div>
+        </section>
+
+        <section id="results-section" class="hidden max-w-4xl mx-auto mb-8">
+            <div class="bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden">
+                <div class="bg-gray-750 px-6 py-4 border-b border-gray-700 flex justify-between items-center">
+                    <h2 class="text-xl font-semibold text-cyber-400"><i class="fa-solid fa-chart-bar mr-2"></i>Résultats du scan</h2>
+                    <span id="result-status" class="px-3 py-1 rounded-full text-sm font-medium"></span>
+                </div>
+                <div class="p-6 space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-gray-700 rounded-lg p-4">
+                            <h3 class="text-sm font-medium text-gray-400 mb-1"><i class="fa-solid fa-globe mr-1"></i>Domaine</h3>
+                            <p id="result-domain" class="text-lg font-mono text-cyber-300">-</p>
+                        </div>
+                        <div class="bg-gray-700 rounded-lg p-4">
+                            <h3 class="text-sm font-medium text-gray-400 mb-1"><i class="fa-solid fa-location-dot mr-1"></i>Adresse IP</h3>
+                            <p id="result-ip" class="text-lg font-mono text-cyber-300">-</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-700 rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-sm font-medium text-gray-400"><i class="fa-solid fa-shield-halved mr-1"></i>Headers de Sécurité HTTP</h3>
+                            <span id="security-score" class="px-2 py-1 bg-gray-600 rounded text-sm font-mono">0/7</span>
+                        </div>
+                        <div class="mb-4">
+                            <h4 class="text-xs text-green-400 font-semibold mb-2"><i class="fa-solid fa-check mr-1"></i>Headers présents :</h4>
+                            <div id="headers-found" class="space-y-1 terminal-text text-sm"></div>
+                        </div>
+                        <div>
+                            <h4 class="text-xs text-red-400 font-semibold mb-2"><i class="fa-solid fa-xmark mr-1"></i>Headers manquants :</h4>
+                            <div id="headers-missing" class="flex flex-wrap gap-2"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-700 rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-gray-400 mb-3"><i class="fa-solid fa-clipboard-list mr-1"></i>Informations WHOIS</h3>
+                        <div id="whois-data" class="terminal-text text-sm text-gray-300"></div>
+                    </div>
+                    
+                    <div class="flex justify-between text-xs text-gray-500 pt-2 border-t border-gray-600">
+                        <span>ID : <span id="result-id" class="font-mono">-</span></span>
+                        <span>Scanné le : <span id="result-timestamp" class="font-mono">-</span></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="error-section" class="hidden max-w-3xl mx-auto mb-8">
+            <div class="bg-red-900/30 border border-red-700 rounded-lg p-6">
+                <div class="flex items-start space-x-3">
+                    <i class="fa-solid fa-triangle-exclamation text-2xl text-red-400"></i>
+                    <div>
+                        <h3 class="font-semibold text-red-400">Erreur lors du scan</h3>
+                        <p id="error-message" class="text-red-300 mt-1">-</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="max-w-4xl mx-auto">
+            <div class="bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-700 flex justify-between items-center">
+                    <h2 class="text-xl font-semibold text-cyber-400"><i class="fa-solid fa-clock-rotate-left mr-2"></i>Historique des scans</h2>
+                    <button id="refresh-history" class="text-sm text-cyber-400 hover:text-cyber-300 transition">
+                        <i class="fa-solid fa-rotate mr-1"></i>Rafraîchir
+                    </button>
+                </div>
+                <div id="history-container" class="divide-y divide-gray-700">
+                    <div class="p-6 text-center text-gray-500">Chargement de l'historique...</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-gray-800 border-t border-gray-700 mt-auto">
+        <div class="container mx-auto px-4 py-4">
+            <p class="text-center text-sm text-gray-500">
+                <i class="fa-solid fa-lock mr-1"></i>DomainRecon - Projet Portfolio Cybersécurité | 
+                <a href="https://github.com/ch4tbl4nc/WHOIS-Tool" class="text-cyber-400 hover:text-cyber-300"><i class="fa-brands fa-github mr-1"></i>GitHub</a>
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        const API_BASE_URL = window.location.port === '80' || window.location.port === '' 
+            ? '/api' 
+            : 'http://localhost:8000';
+        
+        const elements = {
+            scanForm: document.getElementById('scan-form'),
+            domainInput: document.getElementById('domain-input'),
+            scanButton: document.getElementById('scan-button'),
+            loadingSection: document.getElementById('loading-section'),
+            resultsSection: document.getElementById('results-section'),
+            errorSection: document.getElementById('error-section'),
+            resultDomain: document.getElementById('result-domain'),
+            resultIp: document.getElementById('result-ip'),
+            resultStatus: document.getElementById('result-status'),
+            resultId: document.getElementById('result-id'),
+            resultTimestamp: document.getElementById('result-timestamp'),
+            securityScore: document.getElementById('security-score'),
+            headersFound: document.getElementById('headers-found'),
+            headersMissing: document.getElementById('headers-missing'),
+            whoisData: document.getElementById('whois-data'),
+            errorMessage: document.getElementById('error-message'),
+            historyContainer: document.getElementById('history-container'),
+            refreshHistory: document.getElementById('refresh-history'),
+            statusIndicator: document.getElementById('status-indicator'),
+            statusText: document.getElementById('status-text')
+        };
+        
+        function showSection(name) {
+            elements.loadingSection.classList.add('hidden');
+            elements.resultsSection.classList.add('hidden');
+            elements.errorSection.classList.add('hidden');
+            if (name === 'loading') elements.loadingSection.classList.remove('hidden');
+            else if (name === 'results') elements.resultsSection.classList.remove('hidden');
+            else if (name === 'error') elements.errorSection.classList.remove('hidden');
+        }
+        
+        function formatDate(isoDate) {
+            return new Date(isoDate).toLocaleString('fr-FR', {
+                day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+        }
+        
+        function getStatusBadge(status) {
+            const styles = {
+                success: 'bg-green-900 text-green-300',
+                partial: 'bg-yellow-900 text-yellow-300',
+                error: 'bg-red-900 text-red-300'
+            };
+            return styles[status] || 'bg-gray-700 text-gray-300';
+        }
+        
+        function getStatusLabel(status) {
+            const labels = { 
+                success: '<i class="fa-solid fa-check mr-1"></i>Succès', 
+                partial: '<i class="fa-solid fa-exclamation mr-1"></i>Partiel', 
+                error: '<i class="fa-solid fa-xmark mr-1"></i>Erreur' 
+            };
+            return labels[status] || status;
+        }
+        
+        function displayResults(data) {
+            elements.resultDomain.textContent = data.domain;
+            elements.resultIp.textContent = data.ip_address || 'Non résolu';
+            elements.resultId.textContent = data.id;
+            elements.resultTimestamp.textContent = formatDate(data.scan_timestamp);
+            elements.resultStatus.className = `px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(data.status)}`;
+            elements.resultStatus.textContent = getStatusLabel(data.status);
+            elements.securityScore.textContent = data.security_headers?.score || '0/7';
+            
+            const headersFound = data.security_headers?.headers_found || {};
+            elements.headersFound.innerHTML = Object.keys(headersFound).length > 0
+                ? Object.entries(headersFound).map(([h, v]) => 
+                    `<div class="bg-gray-800 px-2 py-1 rounded"><span class="text-green-400">${h}:</span> <span class="text-gray-400">${v.substring(0, 50)}${v.length > 50 ? '...' : ''}</span></div>`
+                ).join('')
+                : '<span class="text-gray-500 italic">Aucun header trouvé</span>';
+            
+            const headersMissing = data.security_headers?.headers_missing || [];
+            elements.headersMissing.innerHTML = headersMissing.length > 0
+                ? headersMissing.map(h => `<span class="px-2 py-1 bg-red-900/30 text-red-400 rounded text-xs">${h}</span>`).join('')
+                : '<span class="text-green-400 italic"><i class="fa-solid fa-check mr-1"></i>Tous présents !</span>';
+            
+            const whois = data.whois_data || {};
+            elements.whoisData.innerHTML = `
+                <div class="grid grid-cols-2 gap-2">
+                    <div><span class="text-gray-500">Registrar:</span> ${whois.registrar || 'N/A'}</div>
+                    <div><span class="text-gray-500">Status:</span> ${whois.status || 'N/A'}</div>
+                    <div><span class="text-gray-500">Création:</span> ${whois.creation_date || 'N/A'}</div>
+                    <div><span class="text-gray-500">Expiration:</span> ${whois.expiration_date || 'N/A'}</div>
+                </div>`;
+            
+            showSection('results');
+        }
+        
+        function displayHistory(scans) {
+            if (!scans || scans.length === 0) {
+                elements.historyContainer.innerHTML = '<div class="p-6 text-center text-gray-500">Aucun scan. Lancez votre premier scan ! <i class="fa-solid fa-rocket"></i></div>';
+                return;
+            }
+            elements.historyContainer.innerHTML = scans.map(s => `
+                <div class="p-4 hover:bg-gray-700 transition cursor-pointer" onclick="loadScan(${s.id})">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center space-x-3">
+                            <span class="font-mono text-cyber-400">${s.domain}</span>
+                            <span class="text-xs text-gray-500">${s.ip_address || 'IP ?'}</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2 py-1 rounded text-xs ${getStatusBadge(s.status)}">${getStatusLabel(s.status)}</span>
+                            <span class="text-xs text-gray-500">${formatDate(s.scan_timestamp)}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        async function checkApiStatus() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/health`);
+                if (res.ok) {
+                    elements.statusIndicator.className = 'w-3 h-3 bg-green-500 rounded-full';
+                    elements.statusText.textContent = 'API en ligne';
+                    elements.statusText.className = 'text-sm text-green-400';
+                } else throw new Error();
+            } catch {
+                elements.statusIndicator.className = 'w-3 h-3 bg-red-500 rounded-full';
+                elements.statusText.textContent = 'API hors ligne';
+                elements.statusText.className = 'text-sm text-red-400';
+            }
+        }
+        
+        async function scanDomain(domain) {
+            showSection('loading');
+            elements.scanButton.disabled = true;
+            try {
+                const res = await fetch(`${API_BASE_URL}/scan`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ domain })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Erreur lors du scan');
+                }
+                displayResults(await res.json());
+                loadHistory();
+            } catch (e) {
+                elements.errorMessage.textContent = e.message;
+                showSection('error');
+            } finally {
+                elements.scanButton.disabled = false;
+            }
+        }
+        
+        async function loadHistory() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/history?limit=10`);
+                if (!res.ok) throw new Error();
+                displayHistory((await res.json()).scans);
+            } catch {
+                elements.historyContainer.innerHTML = '<div class="p-6 text-center text-red-400">⚠️ Impossible de charger l\'historique</div>';
+            }
+        }
+        
+        async function loadScan(id) {
+            showSection('loading');
+            try {
+                const res = await fetch(`${API_BASE_URL}/scan/${id}`);
+                if (!res.ok) throw new Error('Scan non trouvé');
+                displayResults(await res.json());
+            } catch (e) {
+                elements.errorMessage.textContent = e.message;
+                showSection('error');
+            }
+        }
+        
+        elements.scanForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const domain = elements.domainInput.value.trim();
+            if (domain) scanDomain(domain);
+        });
+        
+        elements.refreshHistory.addEventListener('click', loadHistory);
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            checkApiStatus();
+            loadHistory();
+            setInterval(checkApiStatus, 30000);
+        });
+    </script>
+</body>
+</html>
